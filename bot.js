@@ -265,6 +265,12 @@ async function handleWinnerBalance(ctx, chatId, board, cfg, input) {
   ).join("\n");
 }
 
+bot.catch((err, ctx) => {
+  const msg = err.message || "";
+  if (msg.includes("404")) return; // ignore
+  console.error("Bot error:", msg);
+});
+
 // ─── Main Message Handler ─────────────────────────────────────────
 bot.on("message", async (ctx) => {
   const chatId = ctx.chat.id;
@@ -373,7 +379,10 @@ async function main() {
     console.log("🗄️ DB:", process.env.DATABASE_URL ? "✅ አለ" : "❌ የለም!");
     console.log("🤖 AI Key:", process.env.AI_API_KEY_1 ? "✅ አለ" : "❌ የለም!");
 
-    await bot.launch({ dropPendingUpdates: true });
+    await bot.launch({
+      dropPendingUpdates: true,
+      allowedUpdates: ["message", "edited_message", "channel_post"],
+    });
 
     process.once("SIGINT",  () => bot.stop("SIGINT"));
     process.once("SIGTERM", () => bot.stop("SIGTERM"));
