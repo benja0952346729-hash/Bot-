@@ -221,12 +221,15 @@ bot.on("message", async (msg) => {
 
     // ── Admin: አዲስ ጨዋታ ─────────────────────────────────────────
     if (/^\/newgame|አዲስ\s*ጨዋታ|new\s*game/i.test(text) && await isAdmin(chatId, userId)) {
+      // ሙሉ በሙሉ reset
       board = initBoard();
+      board.name_count = {};
+      board.round = (board.round || 1) + 1;
       await saveBoard(chatId, board);
-      Object.assign(getState(chatId), {
+      chatState[chatId] = {
         board_msg_id: null, remaining_msg_id: null,
         msg_count: 0, active: false,
-      });
+      };
       await bot.sendMessage(chatId, "🎰 አዲስ ጨዋታ ተጀምሯል! መልካም ዕድል 🙏");
       await bot.sendMessage(chatId, buildBoardText(board, cfg));
       return;
@@ -260,12 +263,13 @@ bot.on("message", async (msg) => {
     }
 
     // ── AI Call ────────────────────────────────────────────────────
-    console.log(`💬 [${chatId}] "${text}"`);
+    const firstName = msg.from?.first_name || msg.from?.username || "";
+    console.log(`💬 [${chatId}] "${text}" (${firstName})`);
     const boardText = buildBoardText(board, cfg);
 
     let aiResult;
     try {
-      aiResult = await callAI(text, cfg, boardText);
+      aiResult = await callAI(text, cfg, boardText, firstName);
     } catch (aiErr) {
       console.error("❌ AI Error:", aiErr.message);
       return;
