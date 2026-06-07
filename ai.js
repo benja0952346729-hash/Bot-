@@ -104,6 +104,8 @@ JSON format:
 
 ═══ Action Rules ═══
 • "register"  — ሰው slot ሲጠይቅ (ቁጥር + ስም ወይም ቁጥር ብቻ)
+  - ስም ከሌለ → User Telegram name ተጠቀም
+  - ስም ካለ (override) → የጻፈውን ስም ተጠቀም
 • "payment"   — ብር ሲከፈል (ስም + amount ወይም screenshot caption)
 • "transfer"  — slot ሲቀየር (ከ X → Y)
 • "remove"    — slot ሲሰረዝ
@@ -139,7 +141,7 @@ function parseAIJson(raw) {
 }
 
 // ─── Main AI Call ─────────────────────────────────────────────────
-async function callAI(userMessage, gameConfig, boardState = "") {
+async function callAI(userMessage, gameConfig, boardState = "", firstName = "") {
   const examples     = await getExamples(30);
   const systemPrompt = buildSystemPrompt(examples, gameConfig);
   const MODEL        = process.env.AI_MODEL || "deepseek-ai/deepseek-v3";
