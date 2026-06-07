@@ -92,7 +92,7 @@ async function sendFinalBoard(chatId, board, cfg) {
 }
 
 // ─── Apply AI Action to Board ─────────────────────────────────────
-async function applyAction(aiResult, board, cfg, chatId) {
+async function applyAction(aiResult, board, cfg, chatId, firstName = "") {
   const { action } = aiResult;
   let reply = aiResult.reply || "";
   let boardChanged = false;
@@ -100,7 +100,7 @@ async function applyAction(aiResult, board, cfg, chatId) {
   // ── Register ──────────────────────────────────────────────────
   if (action === "register") {
     const block   = parseInt(aiResult.block);
-    const name    = aiResult.name || "Guest";
+    const name    = aiResult.name || firstName || "Guest";
     const isHalf  = !!aiResult.is_half;
     const partner = aiResult.partner || null;
 
@@ -276,12 +276,27 @@ bot.on("message", async (msg) => {
     }
 
     // ── Apply Action ───────────────────────────────────────────────
-    const { reply, boardChanged } = await applyAction(aiResult, board, cfg, chatId);
+    const { reply, boardChanged } = await applyAction(aiResult, board, cfg, chatId, firstName);
 
-    // Board ከተቀየረ → save
+    // Board ከተቀየረ → save + update pinned board message
     if (boardChanged) {
       await saveBoard(chatId, board);
       console.log(`💾 Board saved [${chatId}]`);
+
+      // Active mode ከሆነ board message ይዘምናል
+      if (state.active && state.board_msg_id) {
+        try {
+          await bot.editMessageText(buildBoardText(board, cfg), {
+            chat_id:    chatId,
+            message_id: state.board_msg_id,
+          });
+        } catch (editErr) {
+          // Edit ካልቻለ (ጊዜ አልፏል) → አዲስ ይላካል
+          console.log("Edit failed, sending new board");
+          const bMsg = await bot.sendMessage(chatId, buildBoardText(board, cfg));
+          state.board_msg_id = bMsg.message_id;
+        }
+      }
     }
 
     // Reply
@@ -330,7 +345,7 @@ bot.on("photo", async (msg) => {
       : `Admin ፎቶ ላከ። ዕጣ ውጤት ወይም payment screenshot ሊሆን ይችላል።`;
 
     const aiResult = await callAI(prompt, cfg, buildBoardText(board, cfg));
-    const { reply, boardChanged } = await applyAction(aiResult, board, cfg, chatId);
+    const { reply, boardChanged } = await applyAction(aiResult, board, cfg, chatId, firstName);
 
     if (boardChanged) await saveBoard(chatId, board);
     if (reply) await bot.sendMessage(chatId, reply);
