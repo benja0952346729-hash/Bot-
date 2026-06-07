@@ -147,8 +147,9 @@ async function callAI(userMessage, gameConfig, boardState = "") {
 
       // ── OpenAI-compatible (NVIDIA, Groq, OpenAI, Together...) ──
       const client   = getClient();
+      console.log(`🤖 Calling AI: model=${MODEL} url=${BASE_URL} key=${getApiKey().slice(0,10)}...`);
       const response = await client.chat.completions.create({
-        model:       process.env.AI_MODEL || "deepseek-ai/deepseek-v3",
+        model:       MODEL,
         messages:    [
           { role: "system", content: systemPrompt },
           { role: "user",   content: userContent  },
