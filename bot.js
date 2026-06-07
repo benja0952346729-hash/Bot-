@@ -373,7 +373,7 @@ async function main() {
     console.log("🗄️ DB:", process.env.DATABASE_URL ? "✅ አለ" : "❌ የለም!");
     console.log("🤖 AI Key:", process.env.AI_API_KEY_1 ? "✅ አለ" : "❌ የለም!");
 
-    await bot.launch();
+    await bot.launch({ dropPendingUpdates: true });
 
     process.once("SIGINT",  () => bot.stop("SIGINT"));
     process.once("SIGTERM", () => bot.stop("SIGTERM"));
