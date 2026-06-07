@@ -104,8 +104,9 @@ JSON format:
 
 ═══ Action Rules ═══
 • "register"  — ሰው slot ሲጠይቅ (ቁጥር + ስም ወይም ቁጥር ብቻ)
-  - ስም ከሌለ → User Telegram name ተጠቀም
+  - ስም ከሌለ → name field ላይ User Telegram first name ጻፍ (REQUIRED!)
   - ስም ካለ (override) → የጻፈውን ስም ተጠቀም
+  - NEVER return name: null or name: "Guest" when firstName is provided
 • "payment"   — ብር ሲከፈል (ስም + amount ወይም screenshot caption)
 • "transfer"  — slot ሲቀየር (ከ X → Y)
 • "remove"    — slot ሲሰረዝ
