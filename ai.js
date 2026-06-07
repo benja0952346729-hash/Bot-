@@ -1,7 +1,14 @@
-const OpenAI = require("openai");
-const Anthropic = require("@anthropic-ai/sdk");
-const { Pool } = require("pg");
 require("dotenv").config();
+const OpenAI = require("openai");
+const { Pool } = require("pg");
+
+// ─── Config (ሁሌ fresh) ───────────────────────────────────────────
+function getAIConfig() {
+  return {
+    BASE_URL: process.env.AI_BASE_URL || "https://integrate.api.nvidia.com/v1",
+    MODEL:    process.env.AI_MODEL    || "deepseek-ai/deepseek-v3",
+  };
+}
 
 // ─── API Keys (እስከ 50) ──────────────────────────────────────────
 const API_KEYS = [];
@@ -23,25 +30,11 @@ function rotateKey() {
   console.log(`🔄 Key ${currentKeyIndex + 1}/${API_KEYS.length} ላይ ተዛወረ`);
 }
 
-// ─── Provider Auto-Detect ────────────────────────────────────────
-function detectProvider() {
-  const url = (process.env.AI_BASE_URL || "").toLowerCase();
-  if (url.includes("anthropic")) return "anthropic";
-  if (url.includes("groq"))      return "groq";
-  if (url.includes("openai"))    return "openai";
-  if (url.includes("nvidia"))    return "nvidia";
-  if (url.includes("together"))  return "together";
-  return "openai"; // default (openai-compatible)
-}
-
 function getClient() {
-  const provider = detectProvider();
-  if (provider === "anthropic") {
-    return new Anthropic({ apiKey: getApiKey() });
-  }
+  const { BASE_URL } = getAIConfig();
   return new OpenAI({
-    apiKey: getApiKey(),
-    baseURL: process.env.AI_BASE_URL || "https://integrate.api.nvidia.com/v1",
+    apiKey:  getApiKey(),
+    baseURL: BASE_URL,
   });
 }
 
@@ -56,13 +49,11 @@ async function getExamples(eventTypes = [], limit = 20) {
   try {
     let query  = "SELECT event_type, data FROM training_events";
     const params = [];
-
     if (eventTypes.length > 0) {
       const ph = eventTypes.map((_, i) => `$${i + 1}`).join(",");
       query += ` WHERE event_type IN (${ph})`;
       params.push(...eventTypes);
     }
-
     query += ` ORDER BY RANDOM() LIMIT ${limit}`;
     const result = await pool.query(query, params);
     return result.rows;
@@ -81,7 +72,7 @@ function buildSystemPrompt(examples, cfg) {
   return `አንተ የ Lottery group bot ነህ። አማርኛ እና English ተናጋሪዎችን ታስተናግዳለህ።
 ሰው አማርኛ ቢጽፍ አማርኛ ትመልሳለህ። English ቢጽፍ English ትመልሳለህ።
 
-═══ የጨዳዋታ ሕጎች ═══
+═══ የጨዋታ ሕጎች ═══
 • Slots: ${cfg.slots_total} (01-${cfg.slots_total})
 • Per person: ${cfg.slots_per_person} consecutive slots
 • ሙሉ: ${cfg.price_full}ብር | ግማሽ: ${cfg.price_half}ብር
@@ -93,19 +84,11 @@ function buildSystemPrompt(examples, cfg) {
 • ✅ = ከፍሏል | ❓ = 200ብር ቀሪ
 • ተመሳሳይ ስም: አበበ 2, አበበ 3
 • አጋር ሲወጣ: የቀረው ስም+
-• Upgrade: አበበ+ → አበበ (200 ይጨምራል)
-• Downgrade: አበበ → አበበ+ (200 ይመለሳል፣ payment reset)
-
-═══ Registration Keywords ═══
-• ግማሽ: + ÷ ግ ግማሽ g gm gmash half በግማሽ
-• ሙሉ: ሙሉ mulu bemulu full (default)
-• Global: "ሁሉንም +" → ሁሉም ግማሽ
 
 ═══ Bot Responses ═══
 • ቁጥር ሲመዘገብ: "እሺ 🙏 ገቢ" / "Done 🙏 registered"
 • ተይዟል: "ተቀደምክ 🙏" / "taken 🙏"
 • ወደ መጨረሻ: "እሺ ይፍጠን 🙏"
-• ❓ ሲኖር: 200ብር ቀሪ reminder
 
 ═══ Training Examples ═══
 ${exampleText}
@@ -114,14 +97,13 @@ ${exampleText}
 1. ሁሌ DB data ላይ ተመርኩዘህ መልስ ስጥ
 2. ግራ ሲያጋባ ጥያቄ ጠይቅ
 3. አጭር እና ትክክለኛ መልስ
-4. ✅ የክፍያ ምልክት ብቻ ነው — registration ላይ አትጠቀምበት`;
+4. ✅ የክፍያ ምልክት ብቻ ነው`;
 }
 
 // ─── Main AI Call ─────────────────────────────────────────────────
 async function callAI(userMessage, gameConfig, boardState = "") {
   const examples = await getExamples(
-    ["registration", "payment", "unpaid_warning", "winner_balance"],
-    20
+    ["registration", "payment", "unpaid_warning", "winner_balance"], 20
   );
 
   const systemPrompt = buildSystemPrompt(examples, gameConfig);
@@ -129,25 +111,12 @@ async function callAI(userMessage, gameConfig, boardState = "") {
     ? `Current Board:\n${boardState}\n\nUser: ${userMessage}`
     : `User: ${userMessage}`;
 
-  const provider = detectProvider();
+  const { MODEL, BASE_URL } = getAIConfig();
+  console.log(`🤖 AI: model=${MODEL}`);
 
   for (let attempt = 0; attempt < API_KEYS.length; attempt++) {
     try {
-      // ── Anthropic ──
-      if (provider === "anthropic") {
-        const client   = getClient();
-        const response = await client.messages.create({
-          model:      process.env.AI_MODEL || "claude-3-5-sonnet-20241022",
-          max_tokens: 512,
-          system:     systemPrompt,
-          messages:   [{ role: "user", content: userContent }],
-        });
-        return response.content[0].text;
-      }
-
-      // ── OpenAI-compatible (NVIDIA, Groq, OpenAI, Together...) ──
       const client   = getClient();
-      console.log(`🤖 Calling AI: model=${MODEL} url=${BASE_URL} key=${getApiKey().slice(0,10)}...`);
       const response = await client.chat.completions.create({
         model:       MODEL,
         messages:    [
@@ -158,7 +127,6 @@ async function callAI(userMessage, gameConfig, boardState = "") {
         temperature: 0.3,
       });
       return response.choices[0].message.content;
-
     } catch (err) {
       const msg = (err.message || "").toLowerCase();
       if (msg.includes("429") || msg.includes("rate limit") || msg.includes("quota")) {
@@ -174,4 +142,4 @@ async function callAI(userMessage, gameConfig, boardState = "") {
   throw new Error("❌ ሁሉም keys limit ላይ ናቸው!");
 }
 
-module.exports = { callAI, getExamples, pool, detectProvider };
+module.exports = { callAI, getExamples, pool };
