@@ -216,10 +216,22 @@ bot.on("message", async (msg) => {
     // AI Call
     console.log(`💬 [${chatId}] ${text}`);
     const boardText = buildBoardText(board, cfg);
-    const aiReply   = await callAI(text, cfg, boardText);
+    
+    let aiReply;
+    try {
+      aiReply = await callAI(text, cfg, boardText);
+    } catch (aiErr) {
+      console.error("❌ AI Error:", aiErr.message);
+      return;
+    }
 
     if (aiReply) {
-      await bot.sendMessage(chatId, aiReply, { reply_to_message_id: msg.message_id });
+      try {
+        await bot.sendMessage(chatId, aiReply, { reply_to_message_id: msg.message_id });
+      } catch (sendErr) {
+        console.error("❌ Send Error:", sendErr.message);
+        await bot.sendMessage(chatId, aiReply);
+      }
     }
 
     // Board trigger
