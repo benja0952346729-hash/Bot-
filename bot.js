@@ -366,12 +366,24 @@ bot.on("photo", async (ctx) => {
 
 // ─── Start ────────────────────────────────────────────────────────
 async function main() {
-  await ensureBoardTable();
-  console.log("🤖 Lottery Bot ጀምሯል!");
-  bot.launch();
+  try {
+    await ensureBoardTable();
+    console.log("🤖 Lottery Bot ጀምሯል!");
+    console.log("🔑 Token:", process.env.BOT_TOKEN ? "✅ አለ" : "❌ የለም!");
+    console.log("🗄️ DB:", process.env.DATABASE_URL ? "✅ አለ" : "❌ የለም!");
+    console.log("🤖 AI Key:", process.env.AI_API_KEY_1 ? "✅ አለ" : "❌ የለም!");
 
-  process.once("SIGINT",  () => bot.stop("SIGINT"));
-  process.once("SIGTERM", () => bot.stop("SIGTERM"));
+    await bot.launch();
+
+    process.once("SIGINT",  () => bot.stop("SIGINT"));
+    process.once("SIGTERM", () => bot.stop("SIGTERM"));
+    process.on("uncaughtException", (err) => {
+      console.error("Uncaught:", err.message);
+    });
+  } catch (err) {
+    console.error("❌ Bot start error:", err.message);
+    process.exit(1);
+  }
 }
 
 main().catch(console.error);
